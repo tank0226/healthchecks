@@ -167,6 +167,11 @@ There are separate Django management commands for each task:
     $ ./manage.py prunepings
     ```
 
+  Note: 100 is the default value but you can configure a different
+  limit per-user. To do that, go to the
+  Administration Panel, look up user's **Profile** and modify its
+  "Ping log limit" field.
+
 * Remove old records of sent notifications. For each check, remove
   notifications that are older than the oldest stored ping for same check.
 
@@ -365,6 +370,16 @@ MATRIX_HOMESERVER=https://matrix.org
 MATRIX_USER_ID=@mychecks:matrix.org
 MATRIX_ACCESS_TOKEN=[a long string of characters returned by the login call]
 ```
+
+### PagerDuty Simple Install Flow
+
+To enable PagerDuty [Simple Install Flow](https://developer.pagerduty.com/docs/app-integration-development/events-integration/),
+
+* Register a PagerDuty app at [PagerDuty](https://pagerduty.com/) › Developer Mode › My Apps
+* In the newly created app, add the "Events Integration" functionality
+* Specify a Redirect URL: `https://your-domain.com/integrations/add_pagerduty/`
+* Copy the displayed app_id value (PXXXXX) and put it in the `PD_APP_ID` environment
+  variable
 
 ## Running in Production
 

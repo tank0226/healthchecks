@@ -6,7 +6,9 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from hc.accounts.models import REPORT_CHOICES
 from hc.api.models import TokenBucket
+import pytz
 
 
 class LowercaseEmailField(forms.EmailField):
@@ -26,12 +28,13 @@ class Base64Field(forms.CharField):
             raise ValidationError(message="Cannot decode base64")
 
 
-class AvailableEmailForm(forms.Form):
+class SignupForm(forms.Form):
     # Call it "identity" instead of "email"
     # to avoid some of the dumber bots
     identity = LowercaseEmailField(
         error_messages={"required": "Please enter your email address."}
     )
+    tz = forms.CharField(required=False)
 
     def clean_identity(self):
         v = self.cleaned_data["identity"]
@@ -44,6 +47,15 @@ class AvailableEmailForm(forms.Form):
             )
 
         return v
+
+    def clean_tz(self):
+        # Declare tz as "clean" only if we can find it in pytz.all_timezones
+        if self.cleaned_data["tz"] in pytz.all_timezones:
+            return self.cleaned_data["tz"]
+
+        # Otherwise, return None, and *don't* throw a validation exception:
+        # If user's browser reports a timezone we don't recognize, we
+        # should ignore the timezone but still save the rest of the form.
 
 
 class EmailLoginForm(forms.Form):
@@ -59,7 +71,7 @@ class EmailLoginForm(forms.Form):
         try:
             self.user = User.objects.get(email=v)
         except User.DoesNotExist:
-            raise forms.ValidationError("Incorrect email address.")
+            raise forms.ValidationError("Unknown email address.")
 
         return v
 
@@ -84,8 +96,9 @@ class PasswordLoginForm(forms.Form):
 
 
 class ReportSettingsForm(forms.Form):
-    reports_allowed = forms.BooleanField(required=False)
+    reports = forms.ChoiceField(choices=REPORT_CHOICES)
     nag_period = forms.IntegerField(min_value=0, max_value=86400)
+    tz = forms.CharField()
 
     def clean_nag_period(self):
         seconds = self.cleaned_data["nag_period"]
@@ -94,6 +107,15 @@ class ReportSettingsForm(forms.Form):
             raise forms.ValidationError("Bad nag_period: %d" % seconds)
 
         return td(seconds=seconds)
+
+    def clean_tz(self):
+        # Declare tz as "clean" only if we can find it in pytz.all_timezones
+        if self.cleaned_data["tz"] in pytz.all_timezones:
+            return self.cleaned_data["tz"]
+
+        # Otherwise, return None, and *don't* throw a validation exception:
+        # If user's browser reports a timezone we don't recognize, we
+        # should ignore the timezone but still save the rest of the form.
 
 
 class SetPasswordForm(forms.Form):

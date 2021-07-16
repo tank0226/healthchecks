@@ -78,8 +78,8 @@ class Check(models.Model):
     grace = models.DurationField(default=DEFAULT_GRACE)
     schedule = models.CharField(max_length=100, default="* * * * *")
     tz = models.CharField(max_length=36, default="UTC")
-    subject = models.CharField(max_length=100, blank=True)
-    subject_fail = models.CharField(max_length=100, blank=True)
+    subject = models.CharField(max_length=200, blank=True)
+    subject_fail = models.CharField(max_length=200, blank=True)
     methods = models.CharField(max_length=30, blank=True)
     manual_resume = models.BooleanField(default=False)
 
@@ -307,7 +307,7 @@ class Check(models.Model):
         ping.exitstatus = exitstatus
         ping.save()
 
-    def downtimes(self, months=2):
+    def downtimes(self, months):
         """ Calculate the number of downtimes and downtime minutes per month.
 
         Returns a list of (datetime, downtime_in_secs, number_of_outages) tuples.
@@ -350,6 +350,11 @@ class Check(models.Model):
                 totals[ym][2] = None
 
         return sorted(totals.values())
+
+    def past_downtimes(self):
+        """ Return downtime summary for two previous months. """
+
+        return self.downtimes(3)[:-1]
 
 
 class Ping(models.Model):
@@ -651,11 +656,18 @@ class Channel(models.Model):
         return doc["service_key"]
 
     @property
+    def pd_service_name(self):
+        assert self.kind == "pd"
+        if self.value.startswith("{"):
+            doc = json.loads(self.value)
+            return doc.get("name")
+
+    @property
     def pd_account(self):
         assert self.kind == "pd"
         if self.value.startswith("{"):
             doc = json.loads(self.value)
-            return doc["account"]
+            return doc.get("account")
 
     def latest_notification(self):
         return Notification.objects.filter(channel=self).latest()
@@ -738,6 +750,24 @@ class Channel(models.Model):
         assert self.kind == "signal"
         doc = json.loads(self.value)
         return doc["down"]
+
+    @property
+    def sms_notify_up(self):
+        assert self.kind == "sms"
+        if not self.value.startswith("{"):
+            return False
+
+        doc = json.loads(self.value)
+        return doc.get("up", False)
+
+    @property
+    def sms_notify_down(self):
+        assert self.kind == "sms"
+        if not self.value.startswith("{"):
+            return True
+
+        doc = json.loads(self.value)
+        return doc.get("down", True)
 
     @property
     def opsgenie_key(self):

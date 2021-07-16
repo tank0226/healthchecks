@@ -6,7 +6,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
-from hc.accounts.models import Profile, Project
+from hc.accounts.models import Credential, Profile, Project
 
 
 @mark_safe
@@ -43,7 +43,9 @@ class ProfileFieldset(Fieldset):
     name = "User Profile"
     fields = (
         "email",
-        "reports_allowed",
+        "reports",
+        "tz",
+        "theme",
         "next_report_date",
         "nag_period",
         "next_nag_date",
@@ -69,7 +71,7 @@ class TeamFieldset(Fieldset):
 
 
 class NumChecksFilter(admin.SimpleListFilter):
-    title = "Checks"
+    title = "check count"
 
     parameter_name = "num_checks"
 
@@ -109,14 +111,15 @@ class ProfileAdmin(admin.ModelAdmin):
         "projects",
         "invited",
         "sms",
-        "reports_allowed",
+        "reports",
     )
     list_filter = (
         "user__date_joined",
         "last_active_date",
-        "reports_allowed",
+        "reports",
         "check_limit",
         NumChecksFilter,
+        "theme",
     )
 
     fieldsets = (ProfileFieldset.tuple(), TeamFieldset.tuple())
@@ -242,3 +245,13 @@ class HcUserAdmin(UserAdmin):
 
 admin.site.unregister(User)
 admin.site.register(User, HcUserAdmin)
+
+
+@admin.register(Credential)
+class CredentialAdmin(admin.ModelAdmin):
+    list_display = ("id", "created", "email", "name")
+    search_fields = ["id", "code", "name", "user__email"]
+    list_filter = ["created"]
+
+    def email(self, obj):
+        return obj.user.email

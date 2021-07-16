@@ -29,7 +29,6 @@ from hc.accounts import forms
 from hc.accounts.decorators import require_sudo_mode
 from hc.accounts.models import Credential, Profile, Project, Member
 from hc.api.models import Channel, Check, TokenBucket
-from hc.lib.date import choose_next_report_date
 from hc.payments.models import Subscription
 
 POST_LOGIN_ROUTES = (
@@ -60,7 +59,7 @@ def _allow_redirect(redirect_url):
     return match.url_name in POST_LOGIN_ROUTES
 
 
-def _make_user(email, with_project=True):
+def _make_user(email, tz=None, with_project=True):
     username = str(uuid.uuid4())[:30]
     user = User(username=username, email=email)
     user.set_unusable_password()
@@ -85,7 +84,10 @@ def _make_user(email, with_project=True):
         channel.checks.add(check)
 
     # Ensure a profile gets created
-    Profile.objects.for_user(user)
+    profile = Profile.objects.for_user(user)
+    if tz:
+        profile.tz = tz
+        profile.save()
 
     return user
 
@@ -174,10 +176,11 @@ def signup(request):
         return HttpResponseForbidden()
 
     ctx = {}
-    form = forms.AvailableEmailForm(request.POST)
+    form = forms.SignupForm(request.POST)
     if form.is_valid():
         email = form.cleaned_data["identity"]
-        user = _make_user(email)
+        tz = form.cleaned_data["tz"]
+        user = _make_user(email, tz)
         profile = Profile.objects.for_user(user)
         profile.send_instant_login_link()
         ctx["created"] = True
@@ -447,12 +450,10 @@ def notifications(request):
     if request.method == "POST":
         form = forms.ReportSettingsForm(request.POST)
         if form.is_valid():
-            if profile.reports_allowed != form.cleaned_data["reports_allowed"]:
-                profile.reports_allowed = form.cleaned_data["reports_allowed"]
-                if profile.reports_allowed:
-                    profile.next_report_date = choose_next_report_date()
-                else:
-                    profile.next_report_date = None
+            if form.cleaned_data["tz"]:
+                profile.tz = form.cleaned_data["tz"]
+            profile.reports = form.cleaned_data["reports"]
+            profile.next_report_date = profile.choose_next_report_date()
 
             if profile.nag_period != form.cleaned_data["nag_period"]:
                 # Set the new nag period
@@ -542,7 +543,7 @@ def unsubscribe_reports(request, signed_username):
 
     user = User.objects.get(username=username)
     profile = Profile.objects.for_user(user)
-    profile.reports_allowed = False
+    profile.reports = "off"
     profile.next_report_date = None
     profile.nag_period = td()
     profile.next_nag_date = None
@@ -739,3 +740,23 @@ def login_webauthn(request):
 
     ctx = {"options": base64.b64encode(cbor.encode(options)).decode()}
     return render(request, "accounts/login_webauthn.html", ctx)
+
+
+@login_required
+def appearance(request):
+    profile = request.profile
+
+    ctx = {
+        "page": "appearance",
+        "profile": profile,
+        "status": "default",
+    }
+
+    if request.method == "POST":
+        theme = request.POST.get("theme", "")
+        if theme in ("", "dark"):
+            profile.theme = theme
+            profile.save()
+            ctx["status"] = "info"
+
+    return render(request, "accounts/appearance.html", ctx)

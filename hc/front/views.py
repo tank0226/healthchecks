@@ -311,7 +311,7 @@ def index(request):
         "enable_opsgenie": settings.OPSGENIE_ENABLED is True,
         "enable_pagertree": settings.PAGERTREE_ENABLED is True,
         "enable_pd": settings.PD_ENABLED is True,
-        "enable_pdc": settings.PD_VENDOR_KEY is not None,
+        "enable_pd_simple": settings.PD_APP_ID is not None,
         "enable_prometheus": settings.PROMETHEUS_ENABLED is True,
         "enable_pushbullet": settings.PUSHBULLET_CLIENT_ID is not None,
         "enable_pushover": settings.PUSHOVER_API_TOKEN is not None,
@@ -822,7 +822,6 @@ def channels(request, code):
         "enable_opsgenie": settings.OPSGENIE_ENABLED is True,
         "enable_pagertree": settings.PAGERTREE_ENABLED is True,
         "enable_pd": settings.PD_ENABLED is True,
-        "enable_pdc": settings.PD_VENDOR_KEY is not None,
         "enable_prometheus": settings.PROMETHEUS_ENABLED is True,
         "enable_pushbullet": settings.PUSHBULLET_CLIENT_ID is not None,
         "enable_pushover": settings.PUSHOVER_API_TOKEN is not None,
@@ -881,27 +880,25 @@ def verify_email(request, code, token):
 
 @csrf_exempt
 def unsubscribe_email(request, code, signed_token):
+    ctx = {}
+
     # Some email servers open links in emails to check for malicious content.
     # To work around this, on GET requests we serve a confirmation form.
     # If the signature is at least 5 minutes old, we also include JS code to
     # auto-submit the form.
-    ctx = {}
-    if ":" in signed_token:
-        signer = signing.TimestampSigner(salt="alerts")
-        # First, check the signature without looking at the timestamp:
-        try:
-            token = signer.unsign(signed_token)
-        except signing.BadSignature:
-            return render(request, "bad_link.html")
+    signer = signing.TimestampSigner(salt="alerts")
 
-        # Check if timestamp is older than 5 minutes:
-        try:
-            signer.unsign(signed_token, max_age=300)
-        except signing.SignatureExpired:
-            ctx["autosubmit"] = True
+    # First, check the signature without looking at the timestamp:
+    try:
+        token = signer.unsign(signed_token)
+    except signing.BadSignature:
+        return render(request, "bad_link.html")
 
-    else:
-        token = signed_token
+    # Then, check if timestamp is older than 5 minutes:
+    try:
+        signer.unsign(signed_token, max_age=300)
+    except signing.SignatureExpired:
+        ctx["autosubmit"] = True
 
     channel = get_object_or_404(Channel, code=code, kind="email")
     if channel.make_token() != token:
@@ -1089,6 +1086,21 @@ def add_shell(request, code):
 def add_pd(request, code):
     project = _get_rw_project_for_user(request, code)
 
+    # Simple Install Flow
+    if settings.PD_APP_ID:
+        state = token_urlsafe()
+
+        redirect_url = settings.SITE_ROOT + reverse("hc-add-pd-complete")
+        redirect_url += "?" + urlencode({"state": state})
+
+        install_url = "https://app.pagerduty.com/install/integration?" + urlencode(
+            {"app_id": settings.PD_APP_ID, "redirect_url": redirect_url, "version": "2"}
+        )
+
+        ctx = {"page": "channels", "project": project, "install_url": install_url}
+        request.session["pagerduty"] = (state, str(project.code))
+        return render(request, "integrations/add_pd_simple.html", ctx)
+
     if request.method == "POST":
         form = forms.AddPdForm(request.POST)
         if form.is_valid():
@@ -1101,64 +1113,42 @@ def add_pd(request, code):
     else:
         form = forms.AddPdForm()
 
-    ctx = {"page": "channels", "form": form}
+    ctx = {"page": "channels", "project": project, "form": form}
     return render(request, "integrations/add_pd.html", ctx)
 
 
 @require_setting("PD_ENABLED")
-@require_setting("PD_VENDOR_KEY")
-def pdc_help(request):
-    ctx = {"page": "channels"}
-    return render(request, "integrations/add_pdc.html", ctx)
-
-
-@require_setting("PD_ENABLED")
-@require_setting("PD_VENDOR_KEY")
+@require_setting("PD_APP_ID")
 @login_required
-def add_pdc(request, code):
-    project = _get_rw_project_for_user(request, code)
-
-    state = token_urlsafe()
-    callback = settings.SITE_ROOT + reverse(
-        "hc-add-pdc-complete", args=[project.code, state]
-    )
-    connect_url = "https://connect.pagerduty.com/connect?" + urlencode(
-        {"vendor": settings.PD_VENDOR_KEY, "callback": callback}
-    )
-
-    ctx = {"page": "channels", "project": project, "connect_url": connect_url}
-    request.session["pd"] = state
-    return render(request, "integrations/add_pdc.html", ctx)
-
-
-@require_setting("PD_ENABLED")
-@require_setting("PD_VENDOR_KEY")
-@login_required
-def add_pdc_complete(request, code, state):
-    if "pd" not in request.session:
+def add_pd_complete(request):
+    if "pagerduty" not in request.session:
         return HttpResponseBadRequest()
+
+    state, code = request.session.pop("pagerduty")
+    if request.GET.get("state") != state:
+        return HttpResponseForbidden()
 
     project = _get_rw_project_for_user(request, code)
 
-    session_state = request.session.pop("pd")
-    if session_state != state:
-        return HttpResponseBadRequest()
+    doc = json.loads(request.GET["config"])
+    for item in doc["integration_keys"]:
+        channel = Channel(kind="pd", project=project)
+        channel.name = item["name"]
+        channel.value = json.dumps(
+            {"service_key": item["integration_key"], "account": doc["account"]["name"]}
+        )
+        channel.save()
+        channel.assign_all_checks()
 
-    if request.GET.get("error") == "cancelled":
-        messages.warning(request, "PagerDuty setup was cancelled.")
-        return redirect("hc-channels", project.code)
-
-    channel = Channel(kind="pd", project=project)
-    channel.value = json.dumps(
-        {
-            "service_key": request.GET.get("service_key"),
-            "account": request.GET.get("account"),
-        }
-    )
-    channel.save()
-    channel.assign_all_checks()
     messages.success(request, "The PagerDuty integration has been added!")
     return redirect("hc-channels", project.code)
+
+
+@require_setting("PD_ENABLED")
+@require_setting("PD_APP_ID")
+def pd_help(request):
+    ctx = {"page": "channels"}
+    return render(request, "integrations/add_pd_simple.html", ctx)
 
 
 @require_setting("PAGERTREE_ENABLED")
@@ -1638,7 +1628,7 @@ def add_telegram(request):
 def add_sms(request, code):
     project = _get_rw_project_for_user(request, code)
     if request.method == "POST":
-        form = forms.PhoneNumberForm(request.POST)
+        form = forms.PhoneUpDownForm(request.POST)
         if form.is_valid():
             channel = Channel(project=project, kind="sms")
             channel.name = form.cleaned_data["label"]
@@ -1648,7 +1638,7 @@ def add_sms(request, code):
             channel.assign_all_checks()
             return redirect("hc-channels", project.code)
     else:
-        form = forms.PhoneNumberForm()
+        form = forms.PhoneUpDownForm(initial={"up": False})
 
     ctx = {
         "page": "channels",

@@ -3,12 +3,11 @@
 }
 
 .index-bleed {
-    background: #FFF;
     padding-bottom: 2em;
 }
 
 .get-started-bleed {
-    background: #f2f5f2;
+    background: var(--get-started-bg);
     padding: 3em 0;
 }
 
@@ -45,7 +44,8 @@
 }
 
 #pitch-url code {
-    background: #f5f5f5;
+    color: var(--text-color);
+    background: var(--pre-bg);
     display: inline-block;
     margin-top: 0px;
     padding: 6px 9px;
@@ -83,15 +83,20 @@
     margin-bottom: 80px;
 }
 
-#welcome-integrations h1 {
+#welcome-integrations h2 {
+    font-size: 24px;
     text-align: center;
     margin-bottom: 20px;
 }
 
+#welcome-integrations h2 small {
+    font-size: 14px;
+}
+
 #welcome-integrations .integration {
     display: block;
-    color: #333;
-    border: 1px solid #ddd;
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
     border-radius: 3px;
     padding: 20px 0;
     text-align: center;
@@ -109,13 +114,15 @@
     height: 48px;
 }
 
-#welcome-integrations h3 {
+#welcome-integrations p {
     font-size: 18px;
-    margin-bottom: 0;
+    margin: 20px 0 0 0;
+    line-height: 1.1;
 }
 
-#welcome-integrations h3 small {
+#welcome-integrations p small {
     font-size: 12px;
+    color: #777777;
 }
 
 .use-cases li {
@@ -123,7 +130,7 @@
 }
 
 .page-welcome .tab-content {
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color);
     border-top: 0;
 }
 
@@ -133,7 +140,7 @@
 }
 
 .page-welcome .highlight:nth-child(n+2) {
-    border-top: 1px solid #ddd;
+    border-top: 1px solid var(--border-color);
 }
 
 .page-welcome .tab-pane pre {
@@ -154,9 +161,14 @@
     padding: 0 50px 50px 50px;
 }
 
-#signup-modal h1 {
+#signup-modal div.title {
+    font-size: 30px;
     text-align: center;
     margin: 0 0 50px 0;
+}
+
+#signup-modal label {
+    font-weight: normal;
 }
 
 #signup-modal #link-instruction {

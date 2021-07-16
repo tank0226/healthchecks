@@ -1,0 +1,40 @@
+.jumbotron {
+    background-color:  var(--jumbotron-bg);
+}
+
+.btn-default {
+    color: var(--btn-default-color);
+    background-color: var(--btn-default-bg);
+    border-color: var(--btn-default-border);
+}
+
+.btn-default.active,
+.btn-default:hover,
+.btn-default:hover:active,
+.btn-default:focus,
+.btn-default:active,
+.btn-default.active:hover {
+    color: var(--btn-active-color);
+    background-color: var(--btn-active-bg);
+    border-color: var(--btn-active-border);
+}
+
+.alert-info {
+    background-color: var(--state-info-bg);
+    border-color: var(--state-info-border);
+    color: var(--state-info-color);
+}
+
+.panel-info {
+    border-color: var(--state-info-border);
+}
+
+.alert-success {
+    background-color: var(--alert-success-bg);
+    border-color: var(--alert-success-border);
+    color: var(--alert-success-color);
+}
+
+.panel-success {
+    border-color: var(--alert-success-border);
+}

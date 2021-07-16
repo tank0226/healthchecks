@@ -34,7 +34,7 @@
 }
 
 #login-sep {
-    background:#ddd;
+    background: var(--border-color);
     position: absolute;
     top: 10%;
     right: -1px;
@@ -48,7 +48,7 @@
     width: 40px;
     left: -20px;
     text-align: center;
-    background: #fff;
+    background: var(--body-bg);
     font-style: italic;
     color: #666;
     font-size: 12px;
@@ -70,22 +70,7 @@
     margin: 0 auto;
     width: 30px;
     top: -9px;
-    background: #fff;
-}
-
-#login-signup-cta {
-    font-size: 18px;
-    color: #999;
-    margin-top: 40px;
-}
-
-#login-signup-cta a {
-    color: #999;
-    text-decoration: underline;
-}
-
-#login-signup-cta a:hover {
-    color:  #0091EA;
+    background: var(--body-bg);
 }
 
 #login-password {
