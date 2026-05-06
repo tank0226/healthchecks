@@ -7,6 +7,9 @@ All notable changes to this project will be documented in this file.
 - Send "Monthly Phone/SMS/WA Limit Reached" notice to all team members (not just owner)
 - Include notification text in the "Monthly Phone/SMS/WA Limit Reached" notice
 
+### Bug Fixes
+- Fix WebhookValidator to handle input that contains square brackets
+
 ## v4.2 - 2026-04-28
 
 ### Improvements

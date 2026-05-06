@@ -15,7 +15,12 @@ class WebhookValidator(URLValidator):
     schemes = ["http", "https"]
 
     def add_tld(self, value: str) -> str:
-        fields = list(urlsplit(value))
+        try:
+            fields = list(urlsplit(value))
+        except ValueError:
+            # Doesn't look like an URL. Don't touch and return as-is
+            return value
+
         hostport = fields[1].rsplit(":", maxsplit=1)
         if "." not in hostport[0].rstrip("."):
             # If netloc has no TLD, URLValidator will reject it.

@@ -99,6 +99,8 @@ class AddWebhookTestCase(BaseTestCase):
             # FTP addresses not allowed
             "ftp://example.org",
             "http://example:80.com/",
+            # [foo] may be mistaken for an IPv6 address, but it's not
+            "[foo]",
         ]
 
         self.client.login(username="alice@example.org", password="password")
