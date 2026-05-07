@@ -521,13 +521,7 @@ def delete_check(request: ApiRequest, code: UUID) -> HttpResponse:
     if check.project_id != request.project.id:
         return HttpResponseForbidden()
 
-    # Start a transaction, select for update, delete.
-    # Use get_object_or_404 here again, in case another concurrent request
-    # has *just* deleted this check.
-    with transaction.atomic():
-        check = get_object_or_404(Check.objects.select_for_update(), code=code)
-        check.delete()
-
+    check.rename_and_delete()
     return JsonResponse(check.to_dict(v=request.v))
 
 

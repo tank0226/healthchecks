@@ -860,7 +860,7 @@ def remove_check(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     check = _get_rw_check_for_user(request, code)
 
     project = check.project
-    check.lock_and_delete()
+    check.rename_and_delete()
     return redirect("hc-checks", project.code)
 
 

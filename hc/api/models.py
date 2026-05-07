@@ -18,7 +18,7 @@ from django.contrib.auth.models import User
 from django.contrib.humanize.templatetags.humanize import naturaltime
 from django.core.mail import mail_admins
 from django.core.signing import TimestampSigner
-from django.db import models, transaction
+from django.db import IntegrityError, models, transaction
 from django.db.models import F, QuerySet
 from django.http import HttpRequest
 from django.urls import reverse
@@ -371,14 +371,32 @@ class Check(models.Model):
 
         return "up"
 
-    def lock_and_delete(self) -> None:
-        """Acquire a DB lock for this check, then delete the check.
+    def rename_and_delete(self) -> None:
+        """Change check's code and slug, then delete the check.
 
-        Without the lock the delete can fail, if the check gets pinged while it is
-        in the process of deletion.
+        Without changing code and slug first, the check can get pinged during
+        deletion. The deletion would then fail due to foreign key violation.
+
+        This function:
+
+        1. Updates check's code and slug to a random value
+        2. Deletes the check. This step can still fail if a separate process inserts
+           a ping between steps 1 and 2.
+        3. If delete fails, retries it once. This can *still* fail, but is less likely.
+
         """
-        with transaction.atomic():
-            Check.objects.select_for_update().filter(id=self.id).delete()
+
+        throwaway_uuid = uuid.uuid4()
+        q = Check.objects.filter(id=self.id)
+
+        # Rename so it cannot be pinged any longer
+        q.update(code=throwaway_uuid, slug=str(throwaway_uuid))
+
+        try:
+            q.delete()
+        except IntegrityError:
+            # Retry once
+            q.delete()
 
     def assign_all_channels(self) -> None:
         channels = Channel.objects.filter(project=self.project)
